@@ -43,4 +43,19 @@ STEP 10: post install and other stuff
 
 
 
+
+# INSTALLATION
+
+
+
+
+
+git clone https://github.com/cat00999/GAMELINUX.git
+cd GAMELINUX
+chmod +x install.sh
+./install.sh
+
+
+
+
 the script is open-source and if you do a betterversion show me :)
