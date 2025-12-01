@@ -50,10 +50,10 @@ STEP 10: post install and other stuff
 
 
 
-git clone https://github.com/cat00999/GAMELINUX.git
-cd GAMELINUX
-chmod +x install.sh
-./install.sh
+1. git clone https://github.com/cat00999/GAMELINUX.git
+2. cd GAMELINUX
+3. ./GAMELINUXINSTALLER.sh
+4. now install it by using the CLI wizard helper
 
 
 
