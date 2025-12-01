@@ -1,4 +1,4 @@
-cho              "GameLinux Installer"
+echo              "GameLinux Installer"
 
 
 read -rp "Press ENTER to continue..."
