@@ -6,9 +6,9 @@ echo "
                  .--.
                 |o_o |
                 |:_/ |
-               //   \ \
+               //   \ \\
               (|     | )
-             /'\_   _/`\
+             /'\_   _/`\\
              \___)=(___/
 
         ████████╗██╗   ██╗██╗  ██╗
@@ -54,17 +54,20 @@ console_mode_setup() {
     echo "==============================="
     echo "Installing KDE Plasma and setting up Steam Big Picture mode..."
 
-    # Install KDE Plasma and necessary applications
-    sudo pacman -S --noconfirm plasma kde-applications
+    # Install KDE Plasma and required components
+    sudo pacman -S --noconfirm plasma kde-applications flatpak
 
-    # Install Steam via Flatpak for Big Picture mode
+    # Steam via Flatpak
     flatpak install -y flathub com.valvesoftware.Steam
 
     mkdir -p ~/.config/autostart
-    echo "[Desktop Entry]" > ~/.config/autostart/steam.desktop
-    echo "Name=Steam Big Picture" >> ~/.config/autostart/steam.desktop
-    echo "Exec=flatpak run com.valvesoftware.Steam steam://open/bigpicture" >> ~/.config/autostart/steam.desktop
-    echo "Type=Application" >> ~/.config/autostart/steam.desktop
+    cat <<EOF > ~/.config/autostart/steam.desktop
+[Desktop Entry]
+Name=Steam Big Picture
+Exec=flatpak run com.valvesoftware.Steam steam://open/bigpicture
+Type=Application
+EOF
+
     echo "Steam Big Picture will launch on boot."
 
     read -rp "Press ENTER to continue..."
@@ -79,10 +82,51 @@ desktop_mode_setup() {
     echo "==============================="
     echo " SETTING UP DESKTOP MODE"
     echo "==============================="
-    read -rp "Enter the desktop environment (GNOME, XFCE, etc.) or window manager (e.g., i3): " de
-    sudo pacman -S --noconfirm "$de"
-    echo "$de installed successfully!"
+    echo "Choose your Desktop Environment / Window Manager:"
+    echo "1) KDE Plasma"
+    echo "2) GNOME"
+    echo "3) XFCE"
+    echo "4) Cinnamon"
+    echo "5) MATE"
+    echo "6) i3 Window Manager"
+    echo "7) Hyprland"
+    echo "8) Qtile"
+    echo "9) AwesomeWM"
+    read -rp "Choose an option: " de
 
+    case $de in
+        1)
+            sudo pacman -S --noconfirm plasma kde-applications
+            ;;
+        2)
+            sudo pacman -S --noconfirm gnome
+            ;;
+        3)
+            sudo pacman -S --noconfirm xfce4 xfce4-goodies
+            ;;
+        4)
+            sudo pacman -S --noconfirm cinnamon
+            ;;
+        5)
+            sudo pacman -S --noconfirm mate mate-extra
+            ;;
+        6)
+            sudo pacman -S --noconfirm i3-wm i3status i3lock dmenu
+            ;;
+        7)
+            sudo pacman -S --noconfirm hyprland xdg-desktop-portal-hyprland waybar wofi
+            ;;
+        8)
+            sudo pacman -S --noconfirm qtile
+            ;;
+        9)
+            sudo pacman -S --noconfirm awesome xterm
+            ;;
+        *)
+            echo "Invalid option"; exit 1 ;;
+    esac
+
+    echo "Desktop Environment installed successfully!"
     read -rp "Press ENTER to continue..."
 }
 
@@ -97,26 +141,22 @@ step_gpu() {
     echo "==============================="
     echo "Detecting your GPU..."
 
-    # Detect GPU
-    gpu=$(lspci | grep -i vga)
+    gpu=$(lspci | grep -i 'vga\|3d\|display')
+    echo "Detected: $gpu"
 
-    # Check for NVIDIA
-    if [[ "$gpu" =~ "NVIDIA" ]]; then
-        echo "Detected NVIDIA GPU. Installing NVIDIA drivers..."
+    if echo "$gpu" | grep -qi "NVIDIA"; then
+        echo "Detected NVIDIA GPU. Installing drivers..."
         sudo pacman -S --noconfirm nvidia nvidia-utils
-    # Check for AMD
-    elif [[ "$gpu" =~ "AMD" || "$gpu" =~ "ATI" ]]; then
-        echo "Detected AMD GPU. Installing AMD drivers..."
-        sudo pacman -S --noconfirm xf86-video-amdgpu
-    # Check for Intel
-    elif [[ "$gpu" =~ "Intel" ]]; then
-        echo "Detected Intel GPU. Installing Intel drivers..."
-        sudo pacman -S --noconfirm xf86-video-intel
+    elif echo "$gpu" | grep -qi "AMD\|ATI"; then
+        echo "Detected AMD GPU. Installing drivers..."
+        sudo pacman -S --noconfirm xf86-video-amdgpu mesa
+    elif echo "$gpu" | grep -qi "Intel"; then
+        echo "Detected Intel GPU. Installing drivers..."
+        sudo pacman -S --noconfirm xf86-video-intel mesa
     else
-        echo "GPU not recognized. Skipping driver installation."
+        echo "GPU not recognized, skipping."
     fi
 
-    # Inform user of next step
     read -rp "Press Enter to continue..."
 }
 
@@ -129,23 +169,22 @@ step_create_user() {
     echo "==============================="
     echo " STEP 3: MULTI-USER SETUP"
     echo "==============================="
-    read -rp "Do you want to create a new user for this system? (y/n): " create_user
+    read -rp "Do you want to create a new user? (y/n): " create_user
 
     if [[ $create_user =~ ^[Yy]$ ]]; then
-        read -rp "Enter the username for the new user: " username
+        read -rp "Enter the username: " username
         sudo useradd -m -G wheel -s /bin/bash "$username"
         sudo passwd "$username"
-        echo "User '$username' has been created and granted sudo access."
+        echo "User created: $username"
     else
         echo "Skipping user creation."
     fi
 
-    # Proceed to the next step
     read -rp "Press Enter to continue..."
 }
 
 #####################################################
-# Step: Kernel Selection
+# Kernel Selection
 #####################################################
 
 step_kernel() {
@@ -153,7 +192,6 @@ step_kernel() {
     echo "==============================="
     echo " STEP 4: KERNEL INSTALLATION"
     echo "==============================="
-    echo "Choose a kernel to install:"
     echo "1) Linux-Zen (recommended)"
     echo "2) Stock Linux Kernel"
     echo "3) Hardened Kernel"
@@ -161,29 +199,27 @@ step_kernel() {
     read -rp "Choose an option: " ksel
 
     case $ksel in
-        1) sudo pacman -S linux-zen linux-zen-headers ;;
-        2) sudo pacman -S linux linux-headers ;;
-        3) sudo pacman -S linux-hardened linux-hardened-headers ;;
-        4) echo "Skipping kernel install..." ;;
+        1) sudo pacman -S --noconfirm linux-zen linux-zen-headers ;;
+        2) sudo pacman -S --noconfirm linux linux-headers ;;
+        3) sudo pacman -S --noconfirm linux-hardened linux-hardened-headers ;;
+        4) echo "Skipping..." ;;
+        *) echo "Invalid option." ;;
     esac
 }
 
 #####################################################
-# Step: System Update
+# System Update
 #####################################################
 
 step_update_system() {
     clear
-    echo "==============================="
-    echo " STEP 5: SYSTEM UPDATE"
-    echo "==============================="
     echo "Updating your system..."
     sudo pacman -Syu --noconfirm
     echo "System updated successfully!"
 }
 
 #####################################################
-# Step: Flatpak Installation (for Steam, Lutris, etc.)
+# Flatpak Installation
 #####################################################
 
 step_flatpak() {
@@ -196,7 +232,7 @@ step_flatpak() {
 }
 
 #####################################################
-# Step: Additional Software Setup (Roblox, Heroic, etc.)
+# Roblox
 #####################################################
 
 step_roblox() {
@@ -204,12 +240,11 @@ step_roblox() {
     echo "==============================="
     echo " STEP 7: INSTALLING ROBLOX"
     echo "==============================="
-    read -rp "Do you want to install Roblox? (y/n): " rb
+    read -rp "Install Roblox? (y/n): " rb
 
     if [[ $rb =~ ^[Yy]$ ]]; then
-        flatpak install -y org.vinegarhq.Sober
+        flatpak install -y flathub org.vinegarhq.Sober
         sudo pacman -S --noconfirm wine
-        echo "Roblox installed!"
     else
         echo "Skipping Roblox installation."
     fi
@@ -218,7 +253,7 @@ step_roblox() {
 }
 
 #####################################################
-# Step: Heroic Games Launcher
+# Heroic Games Launcher
 #####################################################
 
 step_heroic() {
@@ -226,20 +261,19 @@ step_heroic() {
     echo "==============================="
     echo " STEP 8: INSTALLING HEROIC GAMES LAUNCHER"
     echo "==============================="
-    read -rp "Install Heroic Games Launcher? (y/n): " hc
+    read -rp "Install Heroic? (y/n): " hc
 
     if [[ $hc =~ ^[Yy]$ ]]; then
-        flatpak install -y com.heroicgameslauncher.hgl
-        echo "Heroic Games Launcher installed!"
+        flatpak install -y flathub com.heroicgameslauncher.hgl
     else
-        echo "Skipping Heroic Games Launcher installation."
+        echo "Skipping Heroic."
     fi
 
     read -rp "Press ENTER to continue..."
 }
 
 #####################################################
-# Step: Steam Installation (via Flatpak)
+# Steam
 #####################################################
 
 step_steam() {
@@ -248,11 +282,11 @@ step_steam() {
     echo " STEP 9: INSTALLING STEAM"
     echo "==============================="
     flatpak install -y flathub com.valvesoftware.Steam
-    echo "Steam installed via Flatpak!"
+    echo "Steam installed."
 }
 
 #####################################################
-# Step: Game Mode (For performance)
+# Gamemode
 #####################################################
 
 step_gamemode() {
@@ -260,17 +294,25 @@ step_gamemode() {
     echo "==============================="
     echo " STEP 10: INSTALLING GAMEMODE"
     echo "==============================="
+
     sudo pacman -S --noconfirm gamemode
-    echo "Gamemode installed!"
 
-    # Enable Gamemode for all games
-    echo "Enabling GameMode for games..."
-    echo "[GameMode]" > ~/.config/systemd/user/gamemoded.service
-    echo "ExecStart=/usr/bin/gamemoded" >> ~/.config/systemd/user/gamemoded.service
-    systemctl --user enable gamemoded.service
-    systemctl --user start gamemoded.service
-    echo "Gamemode enabled and configured to launch with games."
+    mkdir -p ~/.config/systemd/user
 
+    cat <<EOF > ~/.config/systemd/user/gamemoded.service
+[Unit]
+Description=Feral GameMode Daemon
+
+[Service]
+ExecStart=/usr/bin/gamemoded
+
+[Install]
+WantedBy=default.target
+EOF
+
+    systemctl --user enable --now gamemoded.service
+
+    echo "Gamemode installed and enabled."
     read -rp "Press Enter to continue..."
 }
 
@@ -283,38 +325,24 @@ step_verification() {
     echo "==============================="
     echo " STEP 11: POST-INSTALL VERIFICATION"
     echo "==============================="
-    echo "Verifying that everything is installed correctly..."
 
-    # Verify Steam installation
     if flatpak list | grep -q "com.valvesoftware.Steam"; then
-        echo "Steam is installed correctly."
+        echo "✔ Steam is installed"
     else
-        echo "Steam installation failed."
+        echo "✘ Steam installation failed"
     fi
 
-    # Verify GPU drivers installation
-    if lspci | grep -i "NVIDIA" &> /dev/null; then
-        echo "NVIDIA drivers are installed correctly."
-    elif lspci | grep -i "AMD" &> /dev/null; then
-        echo "AMD drivers are installed correctly."
-    elif lspci | grep -i "Intel" &> /dev/null; then
-        echo "Intel drivers are installed correctly."
+    if pacman -Qs gamemode &>/dev/null; then
+        echo "✔ Gamemode installed"
     else
-        echo "GPU drivers installation failed."
-    fi
-
-    # Verify Gamemode
-    if pacman -Qs gamemode &> /dev/null; then
-        echo "Gamemode is installed correctly."
-    else
-        echo "Gamemode installation failed."
+        echo "✘ Gamemode missing"
     fi
 
     read -rp "Press Enter to continue..."
 }
 
 #####################################################
-# Troubleshooting Section (Moved to the end)
+# Troubleshooting
 #####################################################
 
 step_troubleshoot() {
@@ -322,46 +350,35 @@ step_troubleshoot() {
     echo "==============================="
     echo " STEP 12: TROUBLESHOOTING"
     echo "==============================="
-    echo "Here are some common troubleshooting tips:"
-
-    echo -e "\n1. Steam not launching? Try running: 'flatpak run com.valvesoftware.Steam'."
-    echo "2. If you're experiencing poor game performance, make sure you have the correct GPU drivers installed."
-    echo "3. If you can't use your Xbox controller, ensure 'xone-dkms' and 'xone-dongle-firmware' are installed."
-    echo "4. For issues with flatpak apps, try 'flatpak repair'."
-    echo "5. If you're having graphics issues with AMD, try installing 'mesa' alongside the drivers."
+    echo "1. Steam issues? Run: flatpak run com.valvesoftware.Steam"
+    echo "2. Slow performance? Check GPU drivers."
+    echo "3. Flatpak issues? Run: flatpak repair"
+    echo "4. Controller issues? Install xone drivers."
+    echo "5. AMD problems? Ensure MESA is installed."
 
     read -rp "Press Enter to continue..."
 }
 
 #####################################################
-# FINAL STEP: Installation Finished
+# DONE
 #####################################################
 
 step_done() {
     clear
-    echo "==============================="
-    echo " INSTALLATION COMPLETE!"
-    echo "==============================="
-    echo ""
-    echo "All the selected steps have been completed successfully!"
-    echo "You can now reboot your system or continue configuring your system as needed."
-    echo ""
+    echo "Installation complete!"
+    read -rp "Reboot now? (y/n): " rb
 
-    read -rp "Would you like to reboot now? (y/n): " reboot_choice
-
-    if [[ $reboot_choice =~ ^[Yy]$ ]]; then
-        echo "Rebooting your system now..."
+    if [[ $rb =~ ^[Yy]$ ]]; then
         sudo reboot
     else
-        echo "Reboot later by running 'sudo reboot'."
+        echo "Reboot manually when ready."
     fi
-
-    echo ""
-    echo "Press ENTER to exit the wizard."
-    read -rp ""
 }
 
+#####################################################
 # RUN ALL STEPS
+#####################################################
+
 choose_mode
 step_gpu
 step_create_user
