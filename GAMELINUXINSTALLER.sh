@@ -1,6 +1,4 @@
-
-
-echo              "GameLinux Installer"
+cho              "GameLinux Installer"
 
 
 read -rp "Press ENTER to continue..."
@@ -36,10 +34,8 @@ console_mode_setup() {
     echo "==============================="
     echo "Installing KDE Plasma and setting up Steam Big Picture mode..."
 
-    # Install KDE Plasma and required components
     sudo pacman -S --noconfirm plasma kde-applications flatpak
 
-    # Steam via Flatpak
     flatpak install -y flathub com.valvesoftware.Steam
 
     mkdir -p ~/.config/autostart
@@ -125,6 +121,15 @@ step_gpu() {
 
     gpu=$(lspci | grep -i 'vga\|3d\|display')
     echo "Detected: $gpu"
+    echo
+
+    read -rp "Do you want to install GPU drivers? (y/n): " install_gpu
+
+    if [[ ! $install_gpu =~ ^[Yy]$ ]]; then
+        echo "Skipping GPU driver installation."
+        read -rp "Press Enter to continue..."
+        return
+    fi
 
     if echo "$gpu" | grep -qi "NVIDIA"; then
         echo "Detected NVIDIA GPU. Installing drivers..."
@@ -143,7 +148,7 @@ step_gpu() {
 }
 
 #####################################################
-# Multi-User Setup (Option to create a new user)
+# Multi-User Setup
 #####################################################
 
 step_create_user() {
