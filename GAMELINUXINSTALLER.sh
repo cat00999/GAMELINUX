@@ -1,6 +1,4 @@
-echo              "GameLinux Installer"
-
-
+echo "            GameLinux Installer"
 read -rp "Press ENTER to continue..."
 
 #####################################################
@@ -24,7 +22,7 @@ choose_mode() {
 }
 
 #####################################################
-# Console Mode Setup (KDE Plasma + Steam Big Picture)
+# Console Mode Setup
 #####################################################
 
 console_mode_setup() {
@@ -32,10 +30,9 @@ console_mode_setup() {
     echo "==============================="
     echo " SETTING UP CONSOLE MODE"
     echo "==============================="
-    echo "Installing KDE Plasma and setting up Steam Big Picture mode..."
+    echo "Installing KDE Plasma and Steam Big Picture..."
 
     sudo pacman -S --noconfirm plasma kde-applications flatpak
-
     flatpak install -y flathub com.valvesoftware.Steam
 
     mkdir -p ~/.config/autostart
@@ -47,12 +44,11 @@ Type=Application
 EOF
 
     echo "Steam Big Picture will launch on boot."
-
     read -rp "Press ENTER to continue..."
 }
 
 #####################################################
-# Desktop Mode Setup (User's choice of DE/WM)
+# Desktop Mode Setup
 #####################################################
 
 desktop_mode_setup() {
@@ -60,13 +56,13 @@ desktop_mode_setup() {
     echo "==============================="
     echo " SETTING UP DESKTOP MODE"
     echo "==============================="
-    echo "Choose your Desktop Environment / Window Manager:"
+    echo "Choose your Desktop Environment:"
     echo "1) KDE Plasma"
     echo "2) GNOME"
     echo "3) XFCE"
     echo "4) Cinnamon"
     echo "5) MATE"
-    echo "6) i3 Window Manager"
+    echo "6) i3"
     echo "7) Hyprland"
     echo "8) Qtile"
     echo "9) AwesomeWM"
@@ -90,344 +86,306 @@ desktop_mode_setup() {
 }
 
 #####################################################
-# STEP 2: GPU Detection + Driver Installation
+# STEP 1 — GPU Drivers
 #####################################################
 
 step_gpu() {
     clear
     echo "==============================="
-    echo " STEP 2: GPU DRIVER INSTALLATION"
+    echo " STEP 1: GPU DRIVER INSTALLATION"
     echo "==============================="
-    echo "Detecting your GPU..."
+    echo "Detecting GPU…"
 
     gpu=$(lspci | grep -i 'vga\|3d\|display')
-    echo "Detected: $gpu"
+    echo "Detected GPU(s):"
+    echo "$gpu"
     echo
 
-    read -rp "Do you want to install GPU drivers? (y/n): " install_gpu
-
+    read -rp "Install GPU drivers? (y/n): " install_gpu
     if [[ ! $install_gpu =~ ^[Yy]$ ]]; then
-        echo "Skipping GPU driver installation."
-        read -rp "Press Enter to continue..."
+        echo "Skipping GPU drivers."
         return
     fi
 
     if echo "$gpu" | grep -qi "NVIDIA"; then
-        echo "Detected NVIDIA GPU. Installing drivers..."
+        echo "Installing NVIDIA drivers..."
         sudo pacman -S --noconfirm nvidia nvidia-utils nvidia-settings
     elif echo "$gpu" | grep -qi "AMD\|ATI"; then
-        echo "Detected AMD GPU. Installing drivers..."
+        echo "Installing AMD drivers..."
         sudo pacman -S --noconfirm xf86-video-amdgpu mesa corectrl
     elif echo "$gpu" | grep -qi "Intel"; then
-        echo "Detected Intel GPU. Installing drivers..."
+        echo "Installing Intel drivers..."
         sudo pacman -S --noconfirm xf86-video-intel mesa
     else
-        echo "GPU not recognized, skipping."
+        echo "Unknown GPU."
     fi
 
-    read -rp "Press Enter to continue..."
+    read -rp "Press ENTER to continue..."
 }
 
 #####################################################
-# STEP 3: Multi-User Setup
+# STEP 2 — Multi-User Setup
 #####################################################
 
 step_create_user() {
     clear
     echo "==============================="
-    echo " STEP 3: MULTI-USER SETUP"
+    echo " STEP 2: MULTI-USER SETUP"
     echo "==============================="
-    read -rp "Do you want to create a new user? (y/n): " create_user
+    read -rp "Create new user? (y/n): " create_user
 
     if [[ $create_user =~ ^[Yy]$ ]]; then
-        read -rp "Enter the username: " username
+        read -rp "Username: " username
         sudo useradd -m -G wheel -s /bin/bash "$username"
         sudo passwd "$username"
-        echo "User created: $username"
-    else
-        echo "Skipping user creation."
+        echo "User created!"
     fi
 
-    read -rp "Press Enter to continue..."
+    read -rp "Press ENTER to continue..."
 }
 
 #####################################################
-# STEP 4: Kernel Selection
+# STEP 3 — Kernel Selection
 #####################################################
 
 step_kernel() {
     clear
     echo "==============================="
-    echo " STEP 4: KERNEL INSTALLATION"
+    echo " STEP 3: KERNEL INSTALLATION"
     echo "==============================="
     echo "1) Linux-Zen (recommended)"
-    echo "2) Stock Linux Kernel"
-    echo "3) Hardened Kernel"
+    echo "2) Stock Kernel"
+    echo "3) Hardened"
     echo "4) Skip"
-    read -rp "Choose an option: " ksel
+    read -rp "Choose: " k
 
-    case $ksel in
+    case $k in
         1) sudo pacman -S --noconfirm linux-zen linux-zen-headers ;;
         2) sudo pacman -S --noconfirm linux linux-headers ;;
         3) sudo pacman -S --noconfirm linux-hardened linux-hardened-headers ;;
-        4) echo "Skipping..." ;;
-        *) echo "Invalid option." ;;
+        4) ;;
     esac
 }
 
 #####################################################
-# STEP 5 — GPU OVERCLOCKING (Optional)
+# STEP 4 — System Update
 #####################################################
+
+step_update_system() {
+    clear
+    echo "Updating system..."
+    sudo pacman -Syu --noconfirm
+}
+
+##############################################################
+# STEP 5 — AUTOMATIC GPU OVERCLOCKING
+##############################################################
 
 step_gpu_overclock() {
     clear
     echo "==============================="
     echo " STEP 5: GPU OVERCLOCKING"
     echo "==============================="
-    echo "Optional GPU overclocking."
-    echo "Warning: Overclocking can reduce hardware lifespan or cause instability."
-    echo
 
-    read -rp "Do you want to overclock your GPU? (y/n): " oc
+    gpu=$(lspci | grep -i 'vga\|3d\|display')
+    echo "Detected GPU(s): $gpu"
 
-    if [[ ! $oc =~ ^[Yy]$ ]]; then
-        echo "Skipping overclocking."
-        read -rp "Press Enter to continue..."
+    # AMD GPU (CoreCtrl)
+    if echo "$gpu" | grep -qi "AMD\|ATI"; then
+        echo "AMD GPU detected — OC via CoreCtrl."
+        echo "Choose OC level:"
+        echo "1) Mild"
+        echo "2) Medium"
+        echo "3) High"
+        read -rp "Level: " lv
+
+        mkdir -p ~/.config/corectrl
+        echo "[oc]" > ~/.config/corectrl/overclock.conf
+        echo "level=$lv" >> ~/.config/corectrl/overclock.conf
+
+        echo "AMD OC profile saved."
+        read -rp "Press ENTER..."
         return
     fi
 
-    gpu=$(lspci | grep -i 'vga\|3d\|display')
-    echo "Detected GPU: $gpu"
-    echo
-
-    echo "Choose overclock level:"
-    echo "1) Mild (safe)"
-    echo "2) Medium"
-    echo "3) High (risky)"
-    read -rp "Select level: " oc_level
-
-    #####################################
-    # NVIDIA Overclocking
-    #####################################
-    if echo "$gpu" | grep -qi "NVIDIA"; then
-        echo "Applying NVIDIA overclock..."
-
-        case $oc_level in
-            1) core="+50"; mem="+100" ;;
-            2) core="+100"; mem="+200" ;;
-            3) core="+150"; mem="+300" ;;
-            *) echo "Invalid option"; return ;;
-        esac
-
-        nvidia-settings -a "[gpu:0]/GPUGraphicsClockOffset[3]=$core"
-        nvidia-settings -a "[gpu:0]/GPUMemoryTransferRateOffset[3]=$mem"
-
-        echo "NVIDIA OC applied: Core $core, Memory $mem"
+    # Intel GPU — skip
+    if echo "$gpu" | grep -qi "Intel"; then
+        echo "Intel GPU detected — no OC available."
+        read -rp "Press ENTER..."
+        return
     fi
 
-    #####################################
-    # AMD Overclocking
-    #####################################
-    if echo "$gpu" | grep -qi "AMD\|ATI"; then
-        echo "AMD GPU detected — using CoreCtrl."
+    # NVIDIA GPU
+    if echo "$gpu" | grep -qi "NVIDIA"; then
+        echo "NVIDIA GPU detected."
 
-        mkdir -p ~/.config/corectrl
-        cat <<EOF > ~/.config/corectrl/overclock.conf
-[overclock]
-level=$oc_level
+        # Check if CoolBits enabled
+        if grep -Rqi "Coolbits" /etc/X11/xorg.conf.d/20-nvidia.conf 2>/dev/null; then
+            echo "CoolBits enabled. Applying OC…"
+
+            echo "Choose OC level:"
+            echo "1) Mild"
+            echo "2) Medium"
+            echo "3) High"
+            read -rp "Level: " lvl
+
+            case $lvl in
+                1) core=50; mem=100 ;;
+                2) core=100; mem=200 ;;
+                3) core=150; mem=300 ;;
+                *) echo "Invalid"; return ;;
+            esac
+
+            if ! nvidia-settings -q GPUGraphicsClockOffset >/dev/null 2>&1; then
+                echo "⚠ Cannot access overclock settings. Must run X11 session."
+                read -rp "Press ENTER..."
+                return
+            fi
+
+            nvidia-settings -a "[gpu:0]/GPUGraphicsClockOffset[3]=$core"
+            nvidia-settings -a "[gpu:0]/GPUMemoryTransferRateOffset[3]=$mem"
+
+            echo "NVIDIA OC applied: Core +$core, Memory +$mem."
+            read -rp "Press ENTER..."
+            return
+        fi
+
+        # CoolBits NOT enabled — enable & reboot
+        echo "CoolBits not enabled. Enabling now..."
+
+        sudo mkdir -p /etc/X11/xorg.conf.d
+        sudo tee /etc/X11/xorg.conf.d/20-nvidia.conf >/dev/null <<EOF
+Section "Device"
+    Identifier "Nvidia Card"
+    Driver "nvidia"
+    Option "Coolbits" "28"
+EndSection
 EOF
 
-        echo "CoreCtrl installed. Open it to apply your OC safely."
+        echo
+        echo "========================================"
+        echo " CoolBits enabled."
+        echo " A reboot is REQUIRED."
+        echo " After reboot, rerun this installer."
+        echo " Overclocking will be applied automatically."
+        echo "========================================"
+        read -rp "Press ENTER to reboot..."
+        sudo reboot
     fi
-
-    #####################################
-    # INTEL
-    #####################################
-    if echo "$gpu" | grep -qi "Intel"; then
-        echo "Intel GPU detected — overclocking not supported."
-    fi
-
-    read -rp "Press Enter to continue..."
 }
 
 #####################################################
-# STEP 6: System Update
-#####################################################
-
-step_update_system() {
-    clear
-    echo "Updating your system..."
-    sudo pacman -Syu --noconfirm
-    echo "System updated successfully!"
-}
-
-#####################################################
-# STEP 7: Flatpak Installation
+# STEP 6 — Flatpak
 #####################################################
 
 step_flatpak() {
-    clear
-    echo "==============================="
-    echo " STEP 7: INSTALLING FLATPAK"
-    echo "==============================="
     sudo pacman -S --noconfirm flatpak
-    echo "Flatpak installed!"
 }
 
 #####################################################
-# STEP 8: Roblox
+# STEP 7 — Roblox
 #####################################################
 
 step_roblox() {
     clear
-    echo "==============================="
-    echo " STEP 8: INSTALLING ROBLOX"
-    echo "==============================="
-    read -rp "Install Roblox? (y/n): " rb
+    echo "Install Roblox? (y/n)"
+    read -rp "> " rb
 
     if [[ $rb =~ ^[Yy]$ ]]; then
         flatpak install -y flathub org.vinegarhq.Sober
         sudo pacman -S --noconfirm wine
-    else
-        echo "Skipping Roblox installation."
     fi
-
-    read -rp "Press ENTER to continue..."
 }
 
 #####################################################
-# STEP 9: Heroic Games Launcher
+# STEP 8 — Heroic
 #####################################################
 
 step_heroic() {
     clear
-    echo "==============================="
-    echo " STEP 9: INSTALLING HEROIC GAMES LAUNCHER"
-    echo "==============================="
     read -rp "Install Heroic? (y/n): " hc
-
     if [[ $hc =~ ^[Yy]$ ]]; then
         flatpak install -y flathub com.heroicgameslauncher.hgl
-    else
-        echo "Skipping Heroic."
     fi
-
-    read -rp "Press ENTER to continue..."
 }
 
 #####################################################
-# STEP 10: Steam
+# STEP 9 — Steam
 #####################################################
 
 step_steam() {
-    clear
-    echo "==============================="
-    echo " STEP 10: INSTALLING STEAM"
-    echo "==============================="
     flatpak install -y flathub com.valvesoftware.Steam
-    echo "Steam installed."
 }
 
 #####################################################
-# STEP 11: Gamemode
+# STEP 10 — Gamemode
 #####################################################
 
 step_gamemode() {
-    clear
-    echo "==============================="
-    echo " STEP 11: INSTALLING GAMEMODE"
-    echo "==============================="
-
     sudo pacman -S --noconfirm gamemode
 
     mkdir -p ~/.config/systemd/user
-
     cat <<EOF > ~/.config/systemd/user/gamemoded.service
 [Unit]
 Description=Feral GameMode Daemon
-
 [Service]
 ExecStart=/usr/bin/gamemoded
-
 [Install]
 WantedBy=default.target
 EOF
 
     systemctl --user enable --now gamemoded.service
-
-    echo "Gamemode installed and enabled."
-    read -rp "Press Enter to continue..."
 }
 
 #####################################################
-# STEP 12: Verification
+# STEP 11 — Verification
 #####################################################
 
 step_verification() {
     clear
-    echo "==============================="
-    echo " STEP 12: POST-INSTALL VERIFICATION"
-    echo "==============================="
+    echo "Verifying…"
 
-    if flatpak list | grep -q "com.valvesoftware.Steam"; then
-        echo "✔ Steam is installed"
-    else
-        echo "✘ Steam installation failed"
+    if flatpak list | grep -q Steam; then
+        echo "✔ Steam installed"
     fi
-
-    if pacman -Qs gamemode &>/dev/null; then
+    if pacman -Qs gamemode >/dev/null; then
         echo "✔ Gamemode installed"
-    else
-        echo "✘ Gamemode missing"
     fi
 
-    read -rp "Press Enter to continue..."
+    read -rp "Press ENTER..."
 }
 
 #####################################################
-# STEP 13: Troubleshooting
+# STEP 12 — Troubleshooting
 #####################################################
 
 step_troubleshoot() {
     clear
-    echo "==============================="
-    echo " STEP 13: TROUBLESHOOTING"
-    echo "==============================="
-    echo "1. Steam issues? Run: flatpak run com.valvesoftware.Steam"
-    echo "2. Slow performance? Check GPU drivers."
-    echo "3. Flatpak issues? Run: flatpak repair"
-    echo "4. Controller issues? Install xone drivers."
-    echo "5. AMD issues? Ensure MESA and CoreCtrl installed."
-
-    read -rp "Press Enter to continue..."
+    echo "Common Issues:"
+    echo "- If OC didn’t work: Must use X11!"
+    echo "- Flatpak repair: flatpak repair"
+    read -rp "Press ENTER..."
 }
 
 #####################################################
-# FINAL STEP
+# DONE
 #####################################################
 
 step_done() {
-    clear
-    echo "Installation complete!"
     read -rp "Reboot now? (y/n): " rb
-
-    if [[ $rb =~ ^[Yy]$ ]]; then
-        sudo reboot
-    else
-        echo "Reboot manually when ready."
-    fi
+    if [[ $rb =~ ^[Yy]$ ]]; then sudo reboot; fi
 }
 
 #####################################################
-# RUN ALL STEPS
+# RUN SEQUENCE
 #####################################################
 
 choose_mode
 step_gpu
 step_create_user
 step_kernel
-step_gpu_overclock   # <- Your new step 5
 step_update_system
+step_gpu_overclock
 step_flatpak
 step_roblox
 step_heroic
